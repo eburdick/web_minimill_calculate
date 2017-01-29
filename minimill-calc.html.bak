@@ -173,8 +173,6 @@
             var DIALX0 = 0;         //user set starting dial value at x0
             var DIALY0 = 0;         //user set starting dial value at y0
             var MMPERINCH = 25.4;   //millimeters in an inch
-            var DIALX_SIGN = 1;     //X coordinate motion for clockwise dial rotation 1 = positive, -1 = negative
-            var DIALY_SIGN = -1;    //Y coordinate motion for clockwise dial rotation 1 = positive, -1 = negative
 
             //
             // Code to run when the page is loaded
@@ -230,28 +228,26 @@
                 // visibly rounded to 1.0005. This only happens if the value entered is numeric.  If not, it is left
                 // alone. When using metric values the numbers are about a factor of 25 higher, so user entered numbers 
                 // will never get this small, but the rounding should still effectively avoid small fraction issues.
-                // DIALX_SIGN and DIALX_SIGN will invert the coordinate system in X or Y if the corresponding coordinate
-                // is decreased by clockwise motion of the control for that coordinate.
-                // 
+                //
                 var xcoords = [ ];
                 var ycoords = [ ];
                 var index;
                 
                 for (index = 0; index < NUMCOORDS; index++)
                 {
-                    xcoords[index] = DIALX_SIGN *roundToHalfThousanth(document.getElementById("xcoord" + index.toString()).value);
+                    xcoords[index] = roundToHalfThousanth(document.getElementById("xcoord" + index.toString()).value);
                       if (IsNumeric(xcoords[index]))
                       {
                           //
                           // User entered coordinate is recognised as a number.  Write the value back to the input field
                           // to reflect any rounding done on input.
                           //
-                          document.getElementById("xcoord" + index.toString()).value = DIALX_SIGN * xcoords[index];
+                          document.getElementById("xcoord" + index.toString()).value = xcoords[index];
                       }
-                    ycoords[index] = DIALY_SIGN * roundToHalfThousanth(document.getElementById("ycoord" + index.toString()).value);
+                    ycoords[index] = roundToHalfThousanth(document.getElementById("ycoord" + index.toString()).value);
                       if (IsNumeric(ycoords[index]))
                       {
-                          document.getElementById("ycoord" + index.toString()).value = DIALY_SIGN * ycoords[index];
+                          document.getElementById("ycoord" + index.toString()).value = ycoords[index];
                       }
                 }
                 //
@@ -268,7 +264,7 @@
                     scalefactor = MMPERINCH;   
                 }
                 //
-                // Initialize dial settings. These values are updated at the end of processing of each coordinate.
+                // Initialize dial settings. These values are updated at the end of processing of each coordinat.
                 //
                 var dialx = DIALX0;
                 var dialy = DIALY0;
@@ -281,10 +277,6 @@
                 // new dial value to use in the next step. Write the user instructions to the corresponding user instruction
                 // paragraphs defined above. Note dial value setting instructions to the user are rounded to the nearest half
                 // thousanth because any higher resolution is not realistic.
-                //
-                // A note about sign...calcStepAndDial assumes clockwise dial rotation moves the table in a direction that 
-                // cooresponds to positive motion in X and Y. In the case where this is not the case, we reverse the sign
-                // of our inputs to this function.
                 //
                 var stepsAndDial; // variable to carry calcStepsAndDial() returned structure
                 
@@ -323,8 +315,8 @@
                 // for machine backlash, we follow the following guidelines...
                 // 
                 // 1. All final control rotations are done with right turns. This is to avoid forcing the user
-                // to remember the direction.  Assumption: the machine table moves in a positive direction for X and a negative
-                // direction for Y motion with clockwise (rightward) control rotation. We use the language right and left instead of 
+                // to remember the direction.  Assumption: the machine table moves in a positive direction for both X and Y
+                // motion with clockwise (rightward) control rotation. We use the language right and left instead of 
                 // clockwise and counterclockwise because a lot of younger students have trouble with the clock terms.
                 // 
                 // 2. All full control turns are done from and to 0 on the dial. This avoids having to remember the dial
@@ -335,7 +327,7 @@
                 // finished with rotation to the right. This eliminates up to a full turn of backlash. (backlash is typically
                 // 10% to 30% of a turn)
                 //
-                // Example: We want to move the table in X from 0 to -.0525. Dial position for this is going to be 
+                // Example: We want to move the table from 0 to -.0525. Dial position for this is going to be 
                 // .0625 - .0525 = .01. With no backlash, this would just be a left turn directly to .01, but assuming
                 // backlash is .025, this would not work.  As shown below, if we turn the dial left to zero, the
                 // table moves to -.035, which is not far enough.  Another full turn to the left, followed by a full 
@@ -439,7 +431,7 @@
                 }
                 // end code for zero offset
                 
-                // begin code for positive offset.
+                // begin code for positive offset
                 else if (raw_offset > 0)
                 {
                     // User specified coordinate is larger than the current coordinate. All motion is positive, with clockwise
