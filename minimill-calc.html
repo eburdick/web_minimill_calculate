@@ -14,7 +14,15 @@
     
     This program implements a web page that can be run from a server or from
     a file on the client. Once it is loaded by a JavaScript capable browser, all 
-    functionality runs locally. -->
+    functionality runs locally.
+    
+    Update 1/28/2017: Inverted the Y axis to correctly corrspond to real machines
+    with Y axis clockwise controls decreasing the Y coordinate.
+    
+    Update 1/29/2017: Fixed bug introduced yesterday.  By multiplying coordinates
+    by the new constants DIALX_SIGN and DIALY_SIGN, I inadvertently set the initial
+    fields to 0 instead of "".  
+    -->
 
 </head>
 <html>
@@ -169,10 +177,15 @@
                                      
             // Important fixed values
             var NUMCOORDS = 10;     //maximum number of coordinate pairs in the user interface
-            var DIALMAX = .0625;    //amount the table moves with a full turn = maximum dial value
             var DIALX0 = 0;         //user set starting dial value at x0
             var DIALY0 = 0;         //user set starting dial value at y0
             var MMPERINCH = 25.4;   //millimeters in an inch
+
+            // Constants for a common class of Chinese-made minimills. These have lead screws with a 1/16th inch
+            // pitch, X control clockwise motion in the positive direction, and Y control clockwise motion in the 
+            // negative direction.
+            //
+            var DIALMAX = .0625;    //amount the table moves with a full turn = maximum dial value
             var DIALX_SIGN = 1;     //X coordinate motion for clockwise dial rotation 1 = positive, -1 = negative
             var DIALY_SIGN = -1;    //Y coordinate motion for clockwise dial rotation 1 = positive, -1 = negative
 
@@ -231,7 +244,8 @@
                 // alone. When using metric values the numbers are about a factor of 25 higher, so user entered numbers 
                 // will never get this small, but the rounding should still effectively avoid small fraction issues.
                 // DIALX_SIGN and DIALX_SIGN will invert the coordinate system in X or Y if the corresponding coordinate
-                // is decreased by clockwise motion of the control for that coordinate.
+                // is decreased by clockwise motion of the control for that coordinate. This coordinate system transformation
+                // is not visible to the user.
                 // 
                 var xcoords = [ ];
                 var ycoords = [ ];
@@ -239,20 +253,24 @@
                 
                 for (index = 0; index < NUMCOORDS; index++)
                 {
-                    xcoords[index] = DIALX_SIGN *roundToHalfThousanth(document.getElementById("xcoord" + index.toString()).value);
-                      if (IsNumeric(xcoords[index]))
-                      {
-                          //
-                          // User entered coordinate is recognised as a number.  Write the value back to the input field
-                          // to reflect any rounding done on input.
-                          //
-                          document.getElementById("xcoord" + index.toString()).value = DIALX_SIGN * xcoords[index];
-                      }
-                    ycoords[index] = DIALY_SIGN * roundToHalfThousanth(document.getElementById("ycoord" + index.toString()).value);
-                      if (IsNumeric(ycoords[index]))
-                      {
-                          document.getElementById("ycoord" + index.toString()).value = DIALY_SIGN * ycoords[index];
-                      }
+                    // get the coordinate from the user entered form and round it to the nearest half thousanth
+                    xcoords[index] = roundToHalfThousanth(document.getElementById("xcoord" + index.toString()).value);
+                    // if the coordinate is a valid number, then write it as rounded back to the form, then adjust its
+                    // sign if necessary to compensate for a reverse machine control (clockwise moves negative)
+                    if (IsNumeric(xcoords[index]))
+                    {
+                        // User entered coordinate is a valid number. Round it to the nearest half thousanth and write the rounded 
+                        // version back to the form to let the user know about the rounding
+                        document.getElementById("xcoord" + index.toString()).value = xcoords[index];
+                        xcoords[index] = xcoords[index] * DIALX_SIGN;
+                    }
+                    // same operation for Y coordinate
+                    ycoords[index] = roundToHalfThousanth(document.getElementById("ycoord" + index.toString()).value);
+                    if (IsNumeric(ycoords[index]))
+                    {
+                        document.getElementById("ycoord" + index.toString()).value = ycoords[index];
+                        ycoords[index] = ycoords[index] * DIALY_SIGN;
+                    }
                 }
                 //
                 // Get scale factor for units.  If it is inches, the scale factor is 1.0.  If it is millimeters, the
@@ -282,10 +300,6 @@
                 // paragraphs defined above. Note dial value setting instructions to the user are rounded to the nearest half
                 // thousanth because any higher resolution is not realistic.
                 //
-                // A note about sign...calcStepAndDial assumes clockwise dial rotation moves the table in a direction that 
-                // cooresponds to positive motion in X and Y. In the case where this is not the case, we reverse the sign
-                // of our inputs to this function.
-                //
                 var stepsAndDial; // variable to carry calcStepsAndDial() returned structure
                 
                 for (index = 1; index <NUMCOORDS; index++)
@@ -313,7 +327,9 @@
            
             // --------------------------------------------- CalcStepsAndDial ------------------------------------------
             // Calculates the user action needed to move the machine table from one coordinate to the next, and the new
-            // dial setting for use the next time this is called.
+            // dial setting for use the next time this is called. Dial turning is normalized in this function to map
+            // clockwise (right) rotation to increasing coordinate value. If this is inverted in the target machine, then
+            // the coordinate system is transformed in the code that calls this function.
             //
             function calcStepsAndDial(starting_pos,next_pos,starting_dial,coord_label,offset_per_turn,scale_factor)
             {
@@ -450,6 +466,7 @@
                     // Because we are moving in the positive direction, the distance to zero is the same as the distance to 
                     // the dial maximum value (offset_per_turn) so we just subtract the starting position from the maximum
                     // value. A special case is when the dial is already at zero, in which case we just specify zero.
+                    //
                     if (starting_dial == 0)
                     {
                         distance_to_dial_zero = 0;
