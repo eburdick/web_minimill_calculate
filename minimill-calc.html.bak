@@ -22,7 +22,6 @@
     Update 1/29/2017: Fixed bug introduced yesterday.  By multiplying coordinates
     by the new constants DIALX_SIGN and DIALY_SIGN, I inadvertently set the initial
     fields to 0 instead of "".  
-    
     -->
 
 </head>
