@@ -23,7 +23,10 @@
     by the new constants DIALX_SIGN and DIALY_SIGN, I inadvertently set the initial
     fields to 0 instead of "".  
     
-    Udate 2/6/2017: Fixed typo in coordinate labels. X4 and Y4 were transposed
+    Update 2/6/2017: Fixed typo in coordinate labels. X4 and Y4 were transposed
+    
+    Update 2/11/017: Fixed the type above again. I had replaced X4 by Y4, but failed to replace Y4 by X4,
+    so there were two Y4s
     
     -->
 
@@ -131,7 +134,7 @@
         <p class=smallbold id="xinstr3"> No action</p>
         <p class=smallbold id="yinstr3"> No action</p>
 
-        <label class="normal" for="xcoord4">Y4</label>
+        <label class="normal" for="xcoord4">X4</label>
         <input class="normal" type= "number" value="" id="xcoord4" onchange="CalcUserAction()" > <br>
         <label class="normal" for="ycoord4">Y4</label>
         <input class="normal" type= "number" value="" id="ycoord4" onchange="CalcUserAction()" > <br>
