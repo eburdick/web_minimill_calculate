@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<head>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta name="author" content="Ed Burdick">
+    <meta name="version" content="1.0">
+    
+    <!--      Minimill-calc by Ed Burdick
+    
+    This program is designed to support mini milling machine (minimill) users
+    to position the machine's table at a sequence of coordinates. The initial
+    version is designed to work with a machine with a lead screw pitch of 0.0625
+    (1/16) inch, and clockwise rotation of the X and Y controls corresponding 
+    to relative positive motion of the spindle with respect to the table.
+    
+    This program implements a web page that can be run from a server or from
+    a file on the client. Once it is loaded by a JavaScript capable browser, all 
+    functionality runs locally.
+    
+    Update 1/28/2017: Inverted the Y axis to correctly corrspond to real machines
+    with Y axis clockwise controls decreasing the Y coordinate.
+    
+    Update 1/29/2017: Fixed bug introduced yesterday.  By multiplying coordinates
+    by the new constants DIALX_SIGN and DIALY_SIGN, I inadvertently set the initial
+    fields to 0 instead of "".  
+    
+    Update 2/6/2017: Fixed typo in coordinate labels. X4 and Y4 were transposed
+    
+    Update 2/11/2017: Fixed the type above again. I had replaced X4 by Y4, but failed to replace Y4 by X4,
+    so there were two Y4s
+    
+    Update 7/4/2017: Started new file for V2 -- experimenting with creating the coordinate fields on the fly
+    with javascript code, the goal being to start with only two coordinate pairs and have
+    a button for adding new ones as needed. 
+    
+        For today, added one labeled input field at the end using
+        the javascript/HTML Document Object Model (DOM).
+    
+        Next: 
+        
+            add a button at the end of the body for creating a new coordinate pair and insert new coordinate
+            pairs in front of that button. 
+            
+            Create a function for adding a coordinate pair. 
+            
+            Button for removing the last coordinate pair, or is the clear button good enough? 
+        last coordinate pair?
+        
+            
+    -->
+
+</head>
+<html>
+    <style>
+        p.title {font-weight: bold; font-size: 2em;} 
+        p.smallbold {line-height: 1; font-size: 1em; font-weight: bold;}  
+        p.normal {line-height: 1; font-size: 1em;} 
+        input.normal {font-size: 2.5em; width: 5em; background-color: yellow;} 
+        label.normal {font-size: 2.5em;}
+        label.medium {font-size: 1.5em;}
+        button.medium {font-size: 2em;}
+        input[type=radio] {width: 1em; height: 1em; font-size: 1.5em;}
+    </style>
+    <body>
+        <!-- Heading text including initial user instructions -->
+        <p class=title>Mini Mill Coordinate Helper</p>
+        
+        <p class=normal>
+            This tool helps you move the mill<br />
+            table to a sequence of coordinates<br />
+            you specify.</p>
+            
+        <p class=smallbold>
+            Start by moving the table to your<br /> 
+            starting position, making sure to<br /> 
+            end each operation with clockwise<br /> 
+            (right) rotation of the X and Y<br />
+            controls.<br />
+            <br /> 
+            Set both dial indicators to 0.000</p>
+            
+        <p class=smallbold>
+            Select Inches or Millimeters to be <br />
+            the units you want to use</p>
+            
+        <!-- units radio group. Allows user to select whether the input coordinates are to be
+             in inches or millimeters. Note: The two radio buttons are part of the same mutually
+             exclusive group because they have the same name attribute of "units".  -->
+             
+        <form id="unitsform">
+            <input class="medium" id="inchunits" type="radio" name="units" onclick="CalcUserAction()" checked> </input>
+            <label class="medium" for="inchunits">Inches&nbsp;&nbsp;&nbsp;</label>
+            <input class="medium" id="mmunits" type="radio" name="units" onclick="CalcUserAction()"> </input>
+            <label class="medium" for="mmunits">Millimeters</label>
+        </form>
+        <br>   
+        <p class=smallbold>
+            Fill in X0 and Y0 with the coordinates<br /> 
+            you want to assign to the starting position</p>
+            
+        <p class=smallbold>
+            Fill in X1,Y1, etc with the rest <br />
+            of the coordinates you want to <br />
+            visit. Instructions will appear below <br /> 
+            each X,Y, telling you what to do to <br />
+            to move the table to that position. </p>
+        
+
+        <!-- We do not need the calculate button because all other controls activate CalcUserAction() 
+        on value change.  Leaving the code here because it can be useful for debug.
+        
+        <button class="medium" onclick="CalcUserAction()">Calculate</button> 
+        <br />
+        <br />
+        -->
+        
+        <!-- The Clear All button resets all coordinate fields to their initial values to prepare for 
+             a new set of coordinates -->
+             
+        <button class="medium" onclick="ClearAll()">Clear All</button> 
+        <br />
+        <br />
+        
+        <!-- Coordinate pair input fields. The first pair is for the initial position, which can be
+             defined by the user to be any position.  It is initialized to zero, because that will
+             be a common choice. The remainder of the fields are initialized to empty strings, which
+             are interpreted as fields the user does not care about -->
+             
+        <label class="normal" for="xcoord0">X0</label>
+        <input class="normal" type= "number" value="0" id="xcoord0" onchange="CalcUserAction()" > <br>
+        <label class="normal" for="ycoord0">Y0</label>
+        <input class="normal" type= "number" value="0" id="ycoord0" onchange="CalcUserAction()" > <br>
+        <br>        
+        
+        <label class="normal" for="xcoord1">X1</label>
+        <input class="normal" type=  "number" value="" id="xcoord1" onchange="CalcUserAction()" > <br>
+        <label class="normal" for="ycoord1">Y1</label>
+        <input class="normal" type=  "number" value="" id="ycoord1" onchange="CalcUserAction()" > <br>
+        <p class=smallbold id="xinstr1"> No action</p>
+        <p class=smallbold id="yinstr1"> No action</p>
+
+        <label class="normal" for="xcoord2">X2</label>
+        <input class="normal" type=  "number" value="" id="xcoord2" onchange="CalcUserAction()" > <br>
+        <label class="normal" for="ycoord2">Y2</label>
+        <input class="normal" type=  "number" value="" id="ycoord2" onchange="CalcUserAction()" > <br>
+        <p class=smallbold id="xinstr2"> No action</p>
+        <p class=smallbold id="yinstr2"> No action</p>
+
+        <label class="normal" for="xcoord3">X3</label>
+        <input class="normal" type= "number" value="" id="xcoord3" onchange="CalcUserAction()" > <br>
+        <label class="normal" for="ycoord3">Y3</label>
+        <input class="normal" type= "number" value="" id="ycoord3" onchange="CalcUserAction()" > <br>
+        <p class=smallbold id="xinstr3"> No action</p>
+        <p class=smallbold id="yinstr3"> No action</p>
+
+        <label class="normal" for="xcoord4">X4</label>
+        <input class="normal" type= "number" value="" id="xcoord4" onchange="CalcUserAction()" > <br>
+        <label class="normal" for="ycoord4">Y4</label>
+        <input class="normal" type= "number" value="" id="ycoord4" onchange="CalcUserAction()" > <br>
+        <p class=smallbold id="xinstr4"> No action</p>
+        <p class=smallbold id="yinstr4"> No action</p>
+
+        <label class="normal" for="xcoord5">X5</label>
+        <input class="normal" type= "number" value="" id="xcoord5" onchange="CalcUserAction()" > <br>
+        <label class="normal" for="ycoord5">Y5</label>
+        <input class="normal" type= "number" value="" id="ycoord5" onchange="CalcUserAction()" > <br>
+        <p class=smallbold id="xinstr5"> No action</p>
+        <p class=smallbold id="yinstr5"> No action</p>
+
+        <label class="normal" for="xcoord6">X6</label>
+        <input class="normal" type= "number" value="" id="xcoord6" onchange="CalcUserAction()" > <br>
+        <label class="normal" for="ycoord6">Y6</label>
+        <input class="normal" type= "number" value="" id="ycoord6" onchange="CalcUserAction()" > <br>
+        <p class=smallbold id="xinstr6"> No action</p>
+        <p class=smallbold id="yinstr6"> No action</p>
+
+        <label class="normal" for="xcoord7">X7</label>
+        <input class="normal" type= "number" value="" id="xcoord7" onchange="CalcUserAction()" > <br>
+        <label class="normal" for="ycoord7">Y7</label>
+        <input class="normal" type= "number" value="" id="ycoord7" onchange="CalcUserAction()" > <br>
+        <p class=smallbold id="xinstr7"> No action</p>
+        <p class=smallbold id="yinstr7"> No action</p>
+
+        <label class="normal" for="xcoord8">X8</label>
+        <input class="normal" type= "number" value="" id="xcoord8" onchange="CalcUserAction()" > <br>
+        <label class="normal" for="ycoord8">Y8</label>
+        <input class="normal" type= "number" value="" id="ycoord8" onchange="CalcUserAction()" > <br>
+        <p class=smallbold id="xinstr8"> No action</p>
+        <p class=smallbold id="yinstr8"> No action</p>
+
+        <label class="normal" for="xcoord9">X9</label>
+        <input class="normal" type= "number" value="" id="xcoord9" onchange="CalcUserAction()" > <br>
+        <label class="normal" for="ycoord9">Y9</label>
+        <input class="normal" type= "number" value="" id="ycoord9" onchange="CalcUserAction()" > <br>
+        <p class=smallbold id="xinstr9"> No action</p>
+        <p class=smallbold id="yinstr9"> No action</p>
+          
+        <!--
+        javascript functions for calculating text for user instructions.  Also some utility functions.
+        -->
+        <script>
+                                     
+            // Important fixed values
+            var NUMCOORDS = 10;     //maximum number of coordinate pairs in the user interface
+            var DIALX0 = 0;         //user set starting dial value at x0
+            var DIALY0 = 0;         //user set starting dial value at y0
+            var MMPERINCH = 25.4;   //millimeters in an inch
+
+            // Constants for a common class of Chinese-made minimills. These have lead screws with a 1/16th inch
+            // pitch, X control clockwise motion in the positive direction, and Y control clockwise motion in the 
+            // negative direction.
+            //
+            var DIALMAX = .0625;    //amount the table moves with a full turn = maximum dial value
+            var DIALX_SIGN = 1;     //X coordinate motion for clockwise dial rotation 1 = positive, -1 = negative
+            var DIALY_SIGN = -1;    //Y coordinate motion for clockwise dial rotation 1 = positive, -1 = negative
+
+            //
+            // Code to run when the page is loaded
+            //
+
+            //
+            // Test code for V2
+            //
+            // create input element x10
+            var xinput10 = document.createElement("INPUT");
+            xinput10.id = "xcoord10";
+            xinput10.className = "normal";
+            xinput10.type = "number";
+            //xinput10.onchange = "CalcUserAction()";
+
+            // create a label for the input element
+            var labelx10 = document.createElement("LABEL");
+            labelx10.setAttribute("for","xcoord10");  //link the label to the input element
+            labelx10.className = "normal";
+
+            // create a text node for the label
+            var textx10 = document.createTextNode("X10");
+            labelx10.appendChild(textx10); //attach the text to the label
+            
+            //Add the new input and the label to the body
+            document.body.appendChild(labelx10);
+            document.body.appendChild(xinput10);
+           
+            //
+            // end of v2 experimental code
+            //
+            
+            //
+            // Initialize the page when it first loads
+            //
+            
+            ClearAll();
+            
+            // -----------------------------------------------ClearAll--------------------------------------------------
+            //
+            // This is the action function for the Clear All button.  It restores the input fields to their initial values
+            // and recalculates user action
+            //
+            function ClearAll()
+            {
+                // set the first coordinate pair to zeros
+                document.getElementById("xcoord0").value = "0";
+                document.getElementById("ycoord0").value = "0";
+
+                // set the remaining coordinates pairs to empty strings
+                var i;
+                for (i = 1; i < NUMCOORDS; i++)
+                {
+                    document.getElementById("xcoord" + i.toString()).value = "";
+                    document.getElementById("ycoord" + i.toString()).value = "";
+                }
+                
+                // set units radio group to inches
+                document.getElementById("inchunits").checked = true;
+ 
+                // recalculate user action strings and dial setting
+                CalcUserAction();
+                return;
+            }
+            // End of ClearAll()
+            
+            // ---------------------------------------------CalcUserAction----------------------------------------------
+            //
+            // This is the main action routine.  It goes through all of the coordinates in order, starting with X1,Y1,
+            // and calculates user steps, keeping track of the dial positions along the way.
+            //
+            function CalcUserAction() 
+            {           
+                //
+                // This function iterates through all of the coordinate values and incrementally calculates 
+                // action to be taken by the user by calling the calcSteps() function.
+                //
+                
+                //
+                // first, we get all of the coordinates and put them into an array. We round to the nearest .0005 and
+                // write back to the input as we go, so that if the user, for example, enters 1.0004, it will get
+                // visibly rounded to 1.0005. This only happens if the value entered is numeric.  If not, it is left
+                // alone. When using metric values the numbers are about a factor of 25 higher, so user entered numbers 
+                // will never get this small, but the rounding should still effectively avoid small fraction issues.
+                // DIALX_SIGN and DIALX_SIGN will invert the coordinate system in X or Y if the corresponding coordinate
+                // is decreased by clockwise motion of the control for that coordinate. This coordinate system transformation
+                // is not visible to the user.
+                // 
+                var xcoords = [ ];
+                var ycoords = [ ];
+                var index;
+                
+                for (index = 0; index < NUMCOORDS; index++)
+                {
+                    // get the coordinate from the user entered form and round it to the nearest half thousanth
+                    xcoords[index] = roundToHalfThousanth(document.getElementById("xcoord" + index.toString()).value);
+                    // if the coordinate is a valid number, then write it as rounded back to the form, then adjust its
+                    // sign if necessary to compensate for a reverse machine control (clockwise moves negative)
+                    if (IsNumeric(xcoords[index]))
+                    {
+                        // User entered coordinate is a valid number. Round it to the nearest half thousanth and write the rounded 
+                        // version back to the form to let the user know about the rounding
+                        document.getElementById("xcoord" + index.toString()).value = xcoords[index];
+                        xcoords[index] = xcoords[index] * DIALX_SIGN;
+                    }
+                    // same operation for Y coordinate
+                    ycoords[index] = roundToHalfThousanth(document.getElementById("ycoord" + index.toString()).value);
+                    if (IsNumeric(ycoords[index]))
+                    {
+                        document.getElementById("ycoord" + index.toString()).value = ycoords[index];
+                        ycoords[index] = ycoords[index] * DIALY_SIGN;
+                    }
+                }
+                //
+                // Get scale factor for units.  If it is inches, the scale factor is 1.0.  If it is millimeters, the
+                // scale factor is MMPERINCH
+                //
+                var scalefactor;
+                if (document.getElementById("inchunits").checked)
+                {
+                    scalefactor = 1;
+                }
+                else
+                {
+                    scalefactor = MMPERINCH;   
+                }
+                //
+                // Initialize dial settings. These values are updated at the end of processing of each coordinate.
+                //
+                var dialx = DIALX0;
+                var dialy = DIALY0;
+                
+                var userinstructx;
+                var userinstructy;
+                
+                //
+                // Loop through the coordinates, starting at [1]. For each pair, calculate user action and capture the 
+                // new dial value to use in the next step. Write the user instructions to the corresponding user instruction
+                // paragraphs defined above. Note dial value setting instructions to the user are rounded to the nearest half
+                // thousanth because any higher resolution is not realistic.
+                //
+                var stepsAndDial; // variable to carry calcStepsAndDial() returned structure
+                
+                for (index = 1; index <NUMCOORDS; index++)
+                {
+                    // calculate user instruction and new dial value for X
+                    stepsAndDial = calcStepsAndDial(xcoords[index-1],xcoords[index],dialx,"X",DIALMAX,scalefactor);
+                    
+                    // display the corresponding user instruction for X motion
+                    document.getElementById("xinstr" + index.toString()).innerHTML = stepsAndDial.instruct;
+                    
+                    // update to new X dial value
+                    dialx = roundToFour(stepsAndDial.dial);
+                    
+                    // calculate user instruction and new dial value for Y
+                    stepsAndDial = calcStepsAndDial(ycoords[index-1],ycoords[index],dialy,"Y",DIALMAX,scalefactor);
+                    
+                    // display the correspondng user instruction for Y motion
+                    document.getElementById("yinstr" + index.toString()).innerHTML = stepsAndDial.instruct;
+                    
+                    // update to new Y dial value
+                    dialy = roundToFour(stepsAndDial.dial);
+                }
+            }
+            // End CalcUserAction()
+           
+            // --------------------------------------------- CalcStepsAndDial ------------------------------------------
+            // Calculates the user action needed to move the machine table from one coordinate to the next, and the new
+            // dial setting for use the next time this is called. Dial turning is normalized in this function to map
+            // clockwise (right) rotation to increasing coordinate value. If this is inverted in the target machine, then
+            // the coordinate system is transformed in the code that calls this function.
+            //
+            function calcStepsAndDial(starting_pos,next_pos,starting_dial,coord_label,offset_per_turn,scale_factor)
+            {
+                //
+                // This function takes the current position and new position in X or Y and calculates what user operations
+                // are required to get to the new position. To keep things straightforward for the user and compensate      
+                // for machine backlash, we follow the following guidelines...
+                // 
+                // 1. All final control rotations are done with right turns. This is to avoid forcing the user
+                // to remember the direction.  Assumption: the machine table moves in a positive direction for X and a negative
+                // direction for Y motion with clockwise (rightward) control rotation. We use the language right and left instead of 
+                // clockwise and counterclockwise because a lot of younger students have trouble with the clock terms.
+                // 
+                // 2. All full control turns are done from and to 0 on the dial. This avoids having to remember the dial
+                // setting while executing full turns with the control. The dial setting for the initial position (X0, Y0)
+                // is always 0, 0.
+                // 
+                // 3. All motions in the negative direction (left control turns) are overshot a full control turn and then
+                // finished with rotation to the right. This eliminates up to a full turn of backlash. (backlash is typically
+                // 10% to 30% of a turn)
+                //
+                // Example: We want to move the table in X from 0 to -.0525. Dial position for this is going to be 
+                // .0625 - .0525 = .01. With no backlash, this would just be a left turn directly to .01, but assuming
+                // backlash is .025, this would not work.  As shown below, if we turn the dial left to zero, the
+                // table moves to -.035, which is not far enough.  Another full turn to the left, followed by a full 
+                // turn to the right gets the table to -.0625 (dial = 0) and a further turn to .01 gets us to the target
+                // position.
+                //                                                                          |<--full turn-->|
+                //                                                                            .01
+                // dial value (^)           0---------------0---------------0---------------0--^------------0----------
+                // table position (|)                    -.1875          -.125          -.0625 |            0
+                // starting dial position                                                                   ^  
+                // starting table position                                                                  |
+                // rotate left directly to .01 fails to work                                   ^
+                //   (table only starts moving after backlash)                                 `----|                                    
+                // instead, rotate left to 0                                                ^
+                //   (table still not at target position)                                   `----|
+                // rotate left full turn                                    ^
+                //   (table passes target position)                         `----|
+                // rotate right full turn                                                   ^
+                //   (backlash erased due to right turn > .025)                             |
+                // rotate right to .01                                                         ^
+                //   (table in target position)                                                |
+                //                                                                
+                // Note: Part of the user instruction is to turn the control to a dial reading. This function rounds those
+                // readings to the nearest .0005.  
+                //
+                // A few words about numbers and rounding...
+                //
+                // In JavaScript, all numbers are double precision floating point as defined by the IEEE floating point standard.
+                // As a result, funny stuff can happen in the tiny fraction realm, like the integer 1 being internally represented
+                // as 1.000000000017 or something like that.  For the purposes of this program, this would not normally be an
+                // issue because the smallest fraction we really care about is 5/10000. But if we are comparing two numbers,
+                // 1.00000000017 is greater than 1.0 and not equal to it. To avoid problems with this, we strategically round numbers
+                // to the nearest .0005, which is the smallest distance in inches that can be realistically set on the kinds of 
+                // machines this program is for. In the worst case when working in millimeters, this can introduce cumulative error
+                // of up to about .00025 per step, but it would take a perfect storm of 40 of these in the same direction to amount
+                // 1/1000 inch, which would not be a real mechanical problem for what is possible with this class of machine.
+                // 
+                // Arguments:
+                //
+                // starting_pos:    The current X or Y position of the milling machine table
+                // next_pos:        The user specified new position for the milling machine table
+                // starting_dial:   The current setting on the X or Y dial.
+                // coord_label:     "X" if we are working on the x coordinate, "Y" if we are working on the y coordinate
+                // offset_per_turn: The amount the table moves with one full revolution of the X or Y control.
+                // scale_factor:    This is the the amount to scale user positions by - 1 for inches, 25.4 for millimeters
+                //
+                // This function returns two values in the form of a Javascript object with the attributes instruct: and dial: 
+                // as follows...
+                //
+                //      return {
+                //          instruct: a_string_expression,  //control manipulation instructions to the user
+                //          dial: a_numeric_expression      //new dial value that will be used in the next call to this function
+                //      };
+                //
+                // To get these two values, call this function like this...
+                //
+                // var stepsAndDial;
+                // stepsAndDial = calcStepsAndDial (...)
+                // user_instruction = stepsAndDial.instruct;
+                // new_dial = stepsAndDial.dial;
+                //
+                // Syntax note:
+                // My preference for bracket indentation is normally to use the ANSI coding standard, putting the starting 
+                // bracket on a new line, but Javascript has an annoying ("helpful") parser feature that inserts missing
+                // semicolons when the coder leaves them out. One place this happens is at the first opportunity after a 
+                // return statement, which breaks my call format unless I put a significant token after the return keyword.
+                //
+                // Check if next_pos is a number. The input fields are initialized as empty strings, which we do not want interpreted
+                // as zeros, because that would add a user instruction to return the table to zero after visiting the specified
+                // coordinates. This test does interprete a null string as not being numeric. If the field is not numeric, we tell
+                // the user that the coordinate has not been specified.
+                
+                if (!IsNumeric(next_pos))
+                {                    
+                    return {
+                        instruct: coord_label + " not specified. Leave " + coord_label + " control alone", 
+                        dial: roundToFour(starting_dial)
+                    };
+                }
+              
+                // Apply scale factor. We are just converting the starting and ending positions from millimeters to inches 
+                // if the scale factor is not 1.0. The scaling result is rounded to the nearest .0001 to avoid weird floating
+                // point results, particularly when comparing against zero. The dial settings in the user instructions will
+                // still be in inches because that is the way the machine is calibrated.
+            
+                starting_pos = roundToFour(starting_pos / scale_factor);
+                next_pos = roundToFour(next_pos / scale_factor);
+              
+                var raw_offset = roundToFour(next_pos-starting_pos);   //direction and distance the table needs to move to reach new position
+                var distance_to_dial_zero;
+                
+                // In many cases, the table is moving only in X or Y, so the other coordinate has no motion at all
+            
+                // begin zero offset code
+                if (raw_offset == 0) // user has specified no motion in this coordinate
+                {                    
+                    return {
+                        instruct: coord_label + " unchanged. Leave " + coord_label + "control alone", 
+                        dial: roundToFour(starting_dial)
+                    };
+                }
+                // end code for zero offset
+                
+                // begin code for positive offset.
+                else if (raw_offset > 0)
+                {
+                    // User specified coordinate is larger than the current coordinate. All motion is positive, with clockwise
+                    // dial rotation, so no backlash to deal with. Unless the current dial setting is at zero, user is 
+                    // instructed to advance to zero before counting turns unless advancing to zero would pass the target
+                    // position.
+            
+                    // Because we are moving in the positive direction, the distance to zero is the same as the distance to 
+                    // the dial maximum value (offset_per_turn) so we just subtract the starting position from the maximum
+                    // value. A special case is when the dial is already at zero, in which case we just specify zero.
+                    //
+                    if (starting_dial == 0)
+                    {
+                        distance_to_dial_zero = 0;
+                    }
+                    else
+                    {
+                        distance_to_dial_zero = roundToFour(offset_per_turn - starting_dial);
+                    }
+            
+                    // Boundary condition: The user specified offset is exactly the same as the offset to the dial zero position.
+                    // In this case the user advances the control to zero and we are done.
+            
+                    if (raw_offset == distance_to_dial_zero)
+                    { 
+                        return {
+                            instruct: "Turn " + coord_label + " control right to 0.000",
+                            dial: 0
+                        };
+                    }  
+                  
+                    // Boundary condition: The user specified offset is less than the offset to the dial zero position.  In this
+                    // case, the user just advances the control the offset distance with no additional turns.
+                    if (raw_offset < distance_to_dial_zero)
+                    {
+                        return {
+                            instruct: "Turn " + coord_label + " control right to " + roundToHalfThousanth(starting_dial + raw_offset).toString(),
+                            dial: roundToFour(starting_dial + raw_offset)
+                        };
+                        
+                    }
+                    
+                    // All positive motion past this point starts with advancing the control to zero unless the control is
+                    // already at zero. After this advance, there are three cases...
+                    //    Advancing directly to the new dial position with no additional control turns
+                    //    Advancing some number of control turns ending at dial = 0
+                    //    Advancing a number of turns and then advancing to a dial setting
+            
+                    var offset_past_zero = roundToFour(raw_offset - distance_to_dial_zero); //offset remaining after advancing to zero
+                    var full_turns = Math.floor(offset_past_zero / offset_per_turn);  // divide remaining offset by offset_per_turn and truncate to integer
+                    var final_dial_value = offset_past_zero % offset_per_turn;     // fractional part of the above division (mod function)
+                    var turn_or_turns;
+                    //
+                    // a nicety...if full_turns is 1, then we would like user instructions to say 1 turn instead of 1 turns.  We set a string
+                    // for these two words based on this value
+                    //
+                    
+                    if (full_turns > 1)
+                    {
+                        turn_or_turns = "turns"
+                    }
+                    else 
+                    {
+                        turn_or_turns = "turn"
+                    }  
+                    
+                  
+                    if (distance_to_dial_zero == 0)
+                    {
+                        // user is not told to advance to zero because we are already there
+                        
+                        if (offset_past_zero < offset_per_turn)
+                        {
+                            // target offset is less than one turn away...just advance to the new dial value
+                            return {
+                                instruct: "Turn " + coord_label + " control right to " + roundToHalfThousanth(offset_past_zero).toString(),
+                                dial: roundToFour(final_dial_value)
+                            };
+                        }
+                        else if (final_dial_value == 0)
+                        {
+                            // target is an integral number of turns away with nothing left over. Dial position is zero.
+                            return {
+                                instruct: "Turn " + coord_label + " control right " + full_turns.toString() + " " + turn_or_turns + ", ending at 0.000",
+                                dial: roundToFour(final_dial_value)
+                            };
+                        }
+                        else 
+                        {
+                            // target is one more more turns away, plus a fraction of a turn.
+                            return {
+                                instruct: "Turn " + coord_label + " control right " + full_turns.toString() + " " + turn_or_turns + ", then continue to " + 
+                                          roundToHalfThousanth(final_dial_value).toString(),
+                                dial: roundToFour(final_dial_value)
+                            };
+                        }
+                    }
+                    else
+                    {
+                        // control is not at zero, so user needs to advance to zero first
+                        
+                        if (offset_past_zero < offset_per_turn)
+                        {
+                            // target offset is less than one turn away after advancing to zero
+                            
+                            return {
+                                instruct: "Turn " + coord_label + " control right to zero, then to " + roundToHalfThousanth(offset_past_zero).toString(),
+                                dial: roundToFour(final_dial_value)
+                            }
+                        }
+                        else if (final_dial_value == 0)
+                        {
+                            // after advancing to zero, target is exactly an integral number of turns away.
+                            
+                            return {
+                                instruct: "Turn " + coord_label + " control right to zero, then " + full_turns.toString() + " " + turn_or_turns + ", ending at 0.000",
+                                dial: roundToFour(final_dial_value)
+                            }
+                        }
+                        else 
+                        {
+                            // after advancing to zero, target is one or more turns away, plus a fraction of a turn.
+                            
+                            return {
+                                instruct: "Turn " + coord_label + " control right to zero, then " + full_turns.toString() + " " + turn_or_turns + ", then continue to " + 
+                                          roundToHalfThousanth(final_dial_value).toString(),
+                                dial: roundToFour(final_dial_value)
+                            }
+                        }
+                    }
+                } 
+                // end positive offset code
+            
+                // begin negative offset code
+                else
+                {
+                    // user specified coordinate is smaller than the current coordinate, so the control needs to be
+                    // turned to the left, introducting backlash error.  To compensate, the motion is going to be as
+                    // follows:
+                    // 1. Turn left to 0 unless the dial is already at 0
+                    // 2. rotate control left the necessary number of turns required to get to a dial value of 0
+                    //    beyond the target position plus one more turn to compensate for backlash
+                    // 3. rotate control right a full turn to take up the backlash
+                    // 4. rotate control right to get back the amount we passed the target in step 2, thus ending 
+                    //    at the target position
+            
+                    // To avoid getting too confused about the signs of offsets, we use absolute distances in this part of the
+                    // code.
+            
+                    var abs_target_offset = -raw_offset; //absolute value of offset = distance we want the table to move
+                    
+                    // how much the table will move if the dial is moved left to zero (ignoring backlash). In this case, 
+                    // the amount is exactly the same as the starting_dial value because we are just subtracting exactly 
+                    // that amount.
+            
+                    distance_to_dial_zero = roundToFour(starting_dial);
+                    
+                    // after moving to zero, our target distance is that much less
+                    
+                    var distance_after_subtracting_dial = roundToFour(abs_target_offset - distance_to_dial_zero);
+                    
+                    // Boundary condition: The user specified offset is less than the starting dial setting.  In this case, we
+                    // rotate left to zero, then a full turn left then a full turn right to take up the backlash, then to
+                    // the target dial reading.  
+                    // 
+                    // Example: starting dial is 0.030, if raw_offset is -0.010. Target dial is going to be 0.020. To get there:
+                    //
+                    // 1. Rotate left to zero, thus subtracting .030, minus backlash
+                    // 2. Rotate left a full turn, thus subtracting a full dial turn, minus backlash
+                    // 3. Rotate right a full turn, adding back the full dial turn, but eliminating the backlash
+                    // 4. Rotate right to .020, which is our target position with no backlash
+            
+                    if (abs_target_offset < distance_to_dial_zero)
+                    {
+                        return {
+                            instruct: "Turn " + coord_label + " control left to 0.000, then left 1 turn, then right 1 turn, then right to " +
+                                      roundToHalfThousanth(distance_to_dial_zero - abs_target_offset),
+                            dial: roundToFour(distance_to_dial_zero - abs_target_offset)
+                        };
+                    }
+            
+                    // Boundary condition: The user specified offset is exactly the starting dial setting, so the user needs to move the dial left
+                    // to zero.  To remove backlash, we take an extra turn the the left and then a full turn right back to zero
+            
+                    else if (distance_after_subtracting_dial == 0)
+                    { 
+                        return {
+                            instruct: "Turn " + coord_label + " control left to 0.000, then left 1 turn, then right 1 turn.",
+                            dial: 0
+                        };
+                    }
+                    
+                    // Boundary condition: The offset after moving the dial to zero (distance_after_subtracting_dial) is less than a 
+                    // full turn away from the final position. Because we are traversing the dial numbers backward, the new dial setting is 
+                    // going to be the desired distance subtracted from the maximum dial setting. To eliminate backlash, we need to approach
+                    // the final value rotating the control to the right, so we pass the target position, turning a full turn after we pass
+                    // zero. Then, because a full turn may be just a little past our target position, less than the amount of the backlash, we
+                    // add another turn, so a total of two turns to the left. To get back to our desired position, we then do a full turn to
+                    // the right, which eliminates the backlash, and then rotate right to the new dial value. 
+                    
+                    else if (distance_after_subtracting_dial < offset_per_turn)
+                    {
+                        if(distance_to_dial_zero == 0)
+                        { 
+                            // Boundary condion: dial value is already zero.  Do not instruct user to turn control to zero.
+                            //
+                            return {
+                                instruct: "Turn " + coord_label + " control left 2 turns, then right 1 turn, then right to " +
+                                          roundToHalfThousanth(offset_per_turn - distance_after_subtracting_dial).toString(),
+                                dial: roundToFour(offset_per_turn - distance_after_subtracting_dial)
+                            } 
+
+                        }
+                        else
+                        {
+                            // dial value is not zero, so first operation is setting the control to zero.
+                            return {
+                                instruct: "Turn " + coord_label + " control left to 0.000, then left 2 turns, then right 1 turn, then right to " +
+                                          roundToHalfThousanth(offset_per_turn - distance_after_subtracting_dial).toString(),
+                                dial: roundToFour(offset_per_turn - distance_after_subtracting_dial)
+                            } 
+                        }
+                    }
+            
+                    // If none the above boundary conditions are applicable, then the user specified offset is going to take us 
+                    // at least left to zero and a full turn left to reach the target position. We test for this condition here even
+                    // though control should only get here if this test is true.  We fall through to an error.
+                    //
+            
+                    else if (distance_after_subtracting_dial >= offset_per_turn)
+                    {
+                           // Every instruction to the user starts with moving the dial to zero unless the dial is already at zero.  We put this initial
+                           // instruction into a variable to distinguish between these cases.
+                           var initial_instruction;
+                           if (distance_to_dial_zero == 0)
+                           {
+                               initial_instruction = "Turn " + coord_label + " control left ";
+                           }
+                           else 
+                           {
+                               initial_instruction = "Turn " + coord_label + " control left to zero, then left ";
+                           }
+                           
+                           // To determine the number of full turns we need to make to the left, we divide the distance after subtracting the dial
+                           // by the distance covered by a full turn and take the integer part (Math.floor). To get the distance we have to move 
+                           // after these full turns, we get the remainder with a mod function on the same divisor and dividend.
+                           
+                           full_turns = Math.floor(distance_after_subtracting_dial / offset_per_turn);
+                           var distance_after_full_turns = roundToFour(distance_after_subtracting_dial % offset_per_turn);
+                           
+                           // distance_after_full_turn is going to be measured backward on the dial scale so we subtract it from offset_per_turn to
+                           // get the final dial value.  However if it is zero, then the dial does not need to be turned at all after the full turns,
+                           // so the user instruction leaves out that final adjustment.
+            
+                           if (distance_after_full_turns == 0)
+                           {
+                               // target distance is an integral number of full turns. User is instructed to turn the control left that 
+                               // number of turns plus one, then come back one turn to the right to take up backlash.
+            
+                               return {
+                                   instruct: initial_instruction + (full_turns + 1).toString() + " full turns, then right 1 full turn",
+                                   dial: 0
+                               }
+                           }
+                           else
+                           {                              
+                               // target distance is not an integral number of full turns. Because we are moving in a
+                               // negative direction, but need to finish in a positive direction to take up backlash, we add
+                               // a full left turn to get us past the target position, then we add another full turn to
+                               // handle the cases where the final right turn could be too little to pick up the backlash.
+                               // If necessary, user is instructed to turn the control left to zero, then the calculated
+                               // number of full left turns, then an extra turn to get past the target position, then an
+                               // additional left turn followed by a full right turn to pick up the backlash, then right to
+                               // the final setting.
+                               // 
+                               // Example: Assuming a full dial turn is 0.0625...Starting at a dial setting of .005, we want
+                               // to move -0.185. Ignoring backlash, this would translate to left to zero
+                               // (distance_after_subtracting_dial = 0.180) then two full turns to 0, leaving us 0.055
+                               // additional to move, which is going to be a dial reading of 0.0625 - .055 = 0.0075. To
+                               // compensate for backlash, we want to approach that number in the positive direction, so we
+                               // do three full turns left instead of two, thus passing 0.0075 and then come back to 0.0075.
+                               // But the final right turn of only 0.0075 is less than the backlash we want to remove, so we
+                               // add an additional full left turn and an additional full right turn to make sure we handle
+                               // cases like this.
+            
+                               return {
+                                   instruct: initial_instruction + (full_turns + 2).toString() + " full turns, then right 1 full turn, then right to " +
+                                             roundToHalfThousanth(offset_per_turn - distance_after_full_turns).toString(),
+                                   dial: roundToFour(offset_per_turn - distance_after_full_turns)
+                               }
+                           }
+            
+                    }
+                    // end of non boundary condion code
+                    return "Code Error -- code fell through negative offset case";
+                }
+                // end negative offset code
+                return "Code Error -- code fell through offset < 0, offset == 0, offset > 0 tests";
+            }
+            // End CalcStepsAndDial()
+            
+            // ------------------------------------------------ roundToFour ---------------------------------------------
+            //
+            // round to the nearest .0001
+            //
+            function roundToFour(num) 
+            {  
+                //rounds a number to a maximum of four decimal places 
+                return +(Math.round(num + "e+4")  + "e-4");
+            }
+            
+            // End roundToFour()
+            
+            // -------------------------------------------- roundToHalfThousanth ---------------------------------------------
+            //
+            // Utility function to round a number to the nearest .0005.  This is the closest a user can set the dial on
+            // a milling machine calibrated in thousanths of an inch.
+            //
+            // Calculation: Multiply the number by 2000 and round the result to the nearest integer, then divide by 2000.
+            // 
+            // If the digits starting at the fourth decimal place are 25.... or greater, then the fractional part of the
+            // initial product with 2000 will be .50 or greater, causing a round up.
+            //
+            // If the digits starting at the fourth decimal place are 5.... or greater, then the integer part of the
+            // initial product with 2000 will be one larger because of the carry from doubling.
+            //
+            // If the digits starting at the fourth decimal place are 75... or greater, then the integer part of the 
+            // initial product with 2000 will be one larger from the carry as above and the fractional part will be .50 or
+            // greater, forcing an additional round up.
+            //
+            // After the round, the divide by 2000 will result in a 0 in the fourth place for even products and a 5 for odd
+            // products.
+            //
+            // The overall result is that if the fourth digit is within a quarter of 5, then the result will be 5. Outside
+            // of that range, the fourth digit will be truncated to zero or rounded up to the next thousanth.
+            //
+            // Examples: .0624 -> .0625   .0624 * 2000 = 124.8 -> 125 / 2000 = .0625
+            //           .0625 -> .0625   .0625 * 2000 = 125.0 -> 125 / 2000 = .0625
+            //           .0626 -> .0625   .0626 * 2000 = 125.2 -> 125 / 2000 = .0625
+            //           .0627 -> .0625   .0627 * 2000 = 125.4 -> 125 / 2000 = .0625
+            //           .0628 -> .0630   .0628 * 2000 = 125.6 -> 126 / 2000 = .0630
+            //           .0622 -> .0620   .0622 * 2000 = 124.4 -> 124 / 2000 = .0620
+            function roundToHalfThousanth(num) 
+            {  
+                //rounds a number to a half a thousanth. Fourth decimal place will be either 0 or 5. 
+                if (IsNumeric(num)) 
+                {
+                    return (Math.round(num * 2000) / 2000);
+                }
+                else
+                {
+                    return num;
+                };
+            
+            }
+            // End roundToHalfThousanth()
+
+            // ------------------------------------------------- IsNumeric ----------------------------------------------
+            //
+            // Utility function to check if an input is a number. I found this on the web with a lengthy explanation. The basic
+            // idea is that input cannot be a number if (input - 0) != input, then there is a special test to make
+            // sure the input is not an empty string, which would evaluate to zero. 
+            //
+            function IsNumeric(input)
+            {
+                return (input - 0) == input && (''+input).trim().length > 0;
+            }
+            // End IsNumeric            
+        </script>
+    </body>
+</html>
