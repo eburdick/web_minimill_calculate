@@ -1,4 +1,4 @@
- id=""<!DOCTYPE html>
+<!DOCTYPE html>
 <head>
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <meta name="author" content="Ed Burdick">
@@ -43,7 +43,7 @@
         label.normal {font-size: 2.5em;}
         label.medium {font-size: 1.5em;}
         button.medium {font-size: 2.4em;}
-        input[type=radio] {width: 1em9; height: 1em; font-size: 1.5em;}
+        input[type=radio] {width: 1em; height: 1em; font-size: 1.5em;}
     </style>
     <body>
         <!-- Heading text including initial user instructions -->
@@ -85,7 +85,9 @@
         <p class=smallbold>
             Fill in X1,Y1, etc with the rest <br />
             of the coordinates you want to <br />
-            visit. Instructions will appear below <br /> 
+            visit. If your device keyboard has <br />
+            no - key, use the +/- buttons. <br />
+            Instructions will appear below <br /> 
             each X,Y, telling you what to do to <br />
             to move the table to that position. </p>
         
@@ -182,15 +184,19 @@
         <p class=smallbold id="yinstr7"> No action</p>
 
         <label class="normal" for="xcoord8">X8</label>
+        <button class="medium" onclick="NegateField('xcoord8')">+/-</button>
         <input class="normal" type= "number" value="" id="xcoord8" onchange="CalcUserAction()" > <br>
         <label class="normal" for="ycoord8">Y8</label>
+        <button class="medium" onclick="NegateField('ycoord8')">+/-</button>
         <input class="normal" type= "number" value="" id="ycoord8" onchange="CalcUserAction()" > <br>
-        <p class=smallbold id="xinstr8"> No action</p>
+        <p class=smallbold id="xinstr8"> No action</p> 
         <p class=smallbold id="yinstr8"> No action</p>
 
         <label class="normal" for="xcoord9">X9</label>
+        <button class="medium" onclick="NegateField('xcoord9')">+/-</button>
         <input class="normal" type= "number" value="" id="xcoord9" onchange="CalcUserAction()" > <br>
         <label class="normal" for="ycoord9">Y9</label>
+        <button class="medium" onclick="NegateField('ycoord9')">+/-</button>
         <input class="normal" type= "number" value="" id="ycoord9" onchange="CalcUserAction()" > <br>
         <p class=smallbold id="xinstr9"> No action</p>
         <p class=smallbold id="yinstr9"> No action</p>
