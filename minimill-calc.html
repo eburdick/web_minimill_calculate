@@ -35,6 +35,9 @@
     Update 11/29/2017: Added selection elements to allow users to enter mill physical characteristics,
     specifically the motion per turn of the x and y dials and the direction the table moves with a clockwise 
     rotation of the X control and the Y control. The defaults are set for the most common machines
+    
+    Update 12/2/2017: fixed boundary errors caused by floating point representation of decimal values. 
+    This issue showed up for dial pitches that were not fractional powers of two, specifically .05 and .1
     -->
 
 </head>
@@ -231,10 +234,25 @@
             var DIALX0 = 0;         //user set starting dial value at x0
             var DIALY0 = 0;         //user set starting dial value at y0
             var MMPERINCH = 25.4;   //millimeters in an inch
+            
+            //Dealing with the fact that decimal numbers are not exactly represented in binary floating point.
+            // 
+            //The precision we are dealing with in this program is about .00001, or about 1/100th of the calibrated
+            //resolution of a minimill. The maximum error of the floating point form of an inconvenient number like
+            //0.3 is around .0000000001, so within the range we are using, we dont have a big problem as long as we round
+            //appropriately. but at some boudaries, we need to be careful, so we introduce some error bands at these
+            //boundaries, specifically when comparing against zero for dial settings, and when getting the integer floor
+            //and remainder for calculating full dial turns and dial settings. See below...
+            var DIALFUZZ = .00001;       //fuzz factor for dial position comparisons
+             // mostly we don't worry about decimal numbers being a little off in their floating point representation,
+             // but at some boundaries, it matters, like when we are looking for an integer floor of a division and a 
+             // remainder. In these cases, we bias the dividend by a number large enough to compensate for the 
+             // maximum error, but small enough to maintain accuracy in the range of numbers we are using.
+             var FLOATERRORBIAS = .000001; 
 
-            // Constants for a common class of Chinese-made minimills. These have lead screws with a 1/16th inch
+            // Initial Constants for a common class of Chinese-made minimills. These have lead screws with a 1/16th inch
             // pitch, X control clockwise motion in the positive direction, and Y control clockwise motion in the 
-            // negative direction.
+            // negative direction.  o
             //
             var DIALMAX = .0625;    //amount the table moves with a full turn = maximum dial value
             var DIALX_SIGN = 1;     //X coordinate motion for clockwise dial rotation 1 = positive, -1 = negative
@@ -449,10 +467,10 @@
                 // A few words about numbers and rounding...
                 //
                 // In JavaScript, all numbers are double precision floating point as defined by the IEEE floating point standard.
-                // As a result, funny stuff can happen in the tiny fraction realm, like the integer 1 being internally represented
-                // as 1.000000000017 or something like that.  For the purposes of this program, this would not normally be an
+                // As a result, funny stuff can happen in the tiny fraction realm, like .1 being internally represented
+                // as 0.100000001490116119384765625.  For the purposes of this program, this would not normally be an
                 // issue because the smallest fraction we really care about is 5/10000. But if we are comparing two numbers,
-                // 1.00000000017 is greater than 1.0 and not equal to it. To avoid problems with this, we strategically round numbers
+                // 0.100000001490116119384765625 is greater than .1 and not equal to it, so we strategically round numbers
                 // to the nearest .0005, which is the smallest distance in inches that can be realistically set on the kinds of 
                 // machines this program is for. In the worst case when working in millimeters, this can introduce cumulative error
                 // of up to about .00025 per step, but it would take a perfect storm of 40 of these in the same direction to amount
@@ -574,8 +592,8 @@
                     //    Advancing a number of turns and then advancing to a dial setting
             
                     var offset_past_zero = roundToFour(raw_offset - distance_to_dial_zero); //offset remaining after advancing to zero
-                    var full_turns = Math.floor(offset_past_zero / offset_per_turn);  // divide remaining offset by offset_per_turn and truncate to integer
-                    var final_dial_value = offset_past_zero % offset_per_turn;     // fractional part of the above division (mod function)
+                    var full_turns = Math.floor(offset_past_zero / (offset_per_turn-FLOATERRORBIAS));  // divide remaining offset by offset_per_turn and truncate to integer
+                    var final_dial_value = offset_past_zero % (offset_per_turn-FLOATERRORBIAS);     // fractional part of the above division (mod function)
                     var turn_or_turns;
                     //
                     // a nicety...if full_turns is 1, then we would like user instructions to say 1 turn instead of 1 turns.  We set a string
@@ -592,7 +610,7 @@
                     }  
                     
                   
-                    if (distance_to_dial_zero == 0)
+                    if (FuzzyEqual(distance_to_dial_zero, 0, DIALFUZZ))
                     {
                         // user is not told to advance to zero because we are already there
                         
@@ -604,12 +622,12 @@
                                 dial: roundToFour(final_dial_value)
                             };
                         }
-                        else if (final_dial_value == 0)
+                        else if (FuzzyEqual(final_dial_value, 0, DIALFUZZ))
                         {
                             // target is an integral number of turns away with nothing left over. Dial position is zero.
                             return {
                                 instruct: "Turn " + coord_label + " control right " + full_turns.toString() + " " + turn_or_turns + ", ending at 0.000",
-                                dial: roundToFour(final_dial_value)
+                                dial: 0
                             };
                         }
                         else 
@@ -635,7 +653,7 @@
                                 dial: roundToFour(final_dial_value)
                             }
                         }
-                        else if (final_dial_value == 0)
+                        else if (FuzzyEqual(final_dial_value, 0, DIALFUZZ))
                         {
                             // after advancing to zero, target is exactly an integral number of turns away.
                             
@@ -709,7 +727,7 @@
                     // Boundary condition: The user specified offset is exactly the starting dial setting, so the user needs to move the dial left
                     // to zero.  To remove backlash, we take an extra turn the the left and then a full turn right back to zero
             
-                    else if (distance_after_subtracting_dial == 0)
+                    else if (FuzzyEqual(distance_after_subtracting_dial, 0, DIALFUZZ))
                     { 
                         return {
                             instruct: "Turn " + coord_label + " control left to 0.000, then left 1 turn, then right 1 turn.",
@@ -727,8 +745,8 @@
                     
                     else if (distance_after_subtracting_dial < offset_per_turn)
                     {
-                        if(distance_to_dial_zero == 0)
-                        { 
+                        if(FuzzyEqual(distance_to_dial_zero, 0, DIALFUZZ))
+                       { 
                             // Boundary condion: dial value is already zero.  Do not instruct user to turn control to zero.
                             //
                             return {
@@ -759,8 +777,8 @@
                            // Every instruction to the user starts with moving the dial to zero unless the dial is already at zero.  We put this initial
                            // instruction into a variable to distinguish between these cases.
                            var initial_instruction;
-                           if (distance_to_dial_zero == 0)
-                           {
+                           if (FuzzyEqual(distance_to_dial_zero, 0, DIALFUZZ))
+                          {
                                initial_instruction = "Turn " + coord_label + " control left ";
                            }
                            else 
@@ -772,14 +790,14 @@
                            // by the distance covered by a full turn and take the integer part (Math.floor). To get the distance we have to move 
                            // after these full turns, we get the remainder with a mod function on the same divisor and dividend.
                            
-                           full_turns = Math.floor(distance_after_subtracting_dial / offset_per_turn);
-                           var distance_after_full_turns = roundToFour(distance_after_subtracting_dial % offset_per_turn);
+                           full_turns = Math.floor(distance_after_subtracting_dial / (offset_per_turn-FLOATERRORBIAS));
+                           var distance_after_full_turns = roundToFour(distance_after_subtracting_dial % (offset_per_turn-FLOATERRORBIAS));
                            
                            // distance_after_full_turn is going to be measured backward on the dial scale so we subtract it from offset_per_turn to
                            // get the final dial value.  However if it is zero, then the dial does not need to be turned at all after the full turns,
                            // so the user instruction leaves out that final adjustment.
             
-                           if (distance_after_full_turns == 0)
+                           if (FuzzyEqual(distance_after_full_turns, 0, DIALFUZZ))
                            {
                                // target distance is an integral number of full turns. User is instructed to turn the control left that 
                                // number of turns plus one, then come back one turn to the right to take up backlash.
@@ -892,7 +910,17 @@
             {
                 return (input - 0) == input && (''+input).trim().length > 0;
             }
-            // End IsNumeric            
+            // End IsNumeric      
+
+            // ---------------------------------------------------FuzzyEqual---------------------------------------------
+            //
+            // this function tests if two numbers are within a specified distance apart. for example, 
+            // FuzzyEqual(a,b,.00001) returns true if a and b are within .00001 of each other.
+            //
+            function FuzzyEqual(x,y,fuzz)
+            {
+            	return Math.abs(x-y)<fuzz;
+            }
         </script>
     </body>
 </html>
