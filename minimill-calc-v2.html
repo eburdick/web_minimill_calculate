@@ -4,13 +4,10 @@
     <meta name="author" content="Ed Burdick">
     <meta name="version" content="1.0">
     
-    <!--      Minimill-calc by Ed Burdick
+    <!--      Minimill-calc (v2) by Ed Burdick
     
     This program is designed to support mini milling machine (minimill) users
-    to position the machine's table at a sequence of coordinates. The initial
-    version is designed to work with a machine with a lead screw pitch of 0.0625
-    (1/16) inch, and clockwise rotation of the X and Y controls corresponding 
-    to relative positive motion of the spindle with respect to the table.
+    to position the machine's table at a sequence of coordinates.
     
     This program implements a web page that can be run from a server or from
     a file on the client. Once it is loaded by a JavaScript capable browser, all 
@@ -25,7 +22,7 @@
     
     Update 2/6/2017: Fixed typo in coordinate labels. X4 and Y4 were transposed
     
-    Update 2/11/2017: Fixed the type above again. I had replaced X4 by Y4, but failed to replace Y4 by X4,
+    Update 2/11/2017: Fixed the typo above again. I had replaced X4 by Y4, but failed to replace Y4 by X4,
     so there were two Y4s
     
     Update 11/28/2017: Added a negate button next to each coordinate input field. This is to compensate
@@ -38,6 +35,15 @@
     
     Update 12/2/2017: fixed boundary errors caused by floating point representation of decimal values. 
     This issue showed up for dial pitches that were not fractional powers of two, specifically .05 and .1
+    
+    V2 Fork.....
+    
+    Update 12/4/2017: Started working on V2 of this app, which dynamically adds coordinate pairs as 
+    requested by the user instead of setting up a fixed number. This is a new file built from the original.
+    
+    Update 12/15/2017: Removed html code for coordinate pairs 2-9 and added javascript code to extend the form
+    starting at coordinate pair 2 on demand. Put the form elements for specifying coordinates inside of a 
+    div and added a button to extend the number of coordinate pairs one at a time.
     -->
 
 </head>
@@ -54,7 +60,7 @@
     </style>
     <body>
         <!-- Heading text including initial user instructions -->
-        <p class=title>Mini Mill Coordinate Helper</p>
+        <p class=title>Mini Mill Coordinate Helper V2</p>
         <p> Ed Burdick </p>
         
         <p class=normal>
@@ -88,9 +94,8 @@
         <p class=smallbold>
             Start by moving the table to your<br /> 
             starting position, making sure to<br /> 
-            end each operation with clockwise<br /> 
-            (right) rotation of the X and Y<br />
-            controls.<br />
+            end each operation with a full clockwise<br /> 
+            (right) turn of the X and Y controls.<br />
             <br /> 
             Set both dial indicators to 0.000</p>
             
@@ -108,7 +113,7 @@
             <input class="medium" id="mmunits" type="radio" name="units" onclick="CalcUserAction()"> </input>
             <label class="medium" for="mmunits">Millimeters</label>
         </form>
-        <br>   
+        <br />   
         <p class=smallbold>
             Fill in X0 and Y0 with the coordinates<br /> 
             you want to assign to the starting position</p>
@@ -132,37 +137,43 @@
         
         <!-- Div for Coordinate pair input fields. The first pair is for the initial position, which can be
         defined by the user to be any position.  It is initialized to zero, because that will
-        be a common choice. The remainder of the fields are initialized to empty strings, which
-        are interpreted as fields the user does not care about -->
-        <div id="coorddiv">     
+        be a common choice. The second pakr of fields is initialized to empty strings, which
+        are interpreted as fields the user has not entered -->
+        <div id="coorddiv">   
+  
 	        <label class="normal" for="xcoord0">X0</label>
             <button class="medium" onclick="NegateField('xcoord0')">+/-</button>
-            <input class="normal" type= "number" value="0" id="xcoord0" onchange="CalcUserAction()" > <br>
+            <input class="normal" type= "number" value="0" id="xcoord0" onchange="CalcUserAction()" > <br />
             <label class="normal" for="ycoord0">Y0</label>
             <button class="medium" onclick="NegateField('ycoord0')">+/-</button>
-            <input class="normal" type= "number" value="0" id="ycoord0" onchange="CalcUserAction()" > <br>
-            <br>        
+            <input class="normal" type= "number" value="0" id="ycoord0" onchange="CalcUserAction()" > <br />
+            <br />        
         
             <label class="normal" for="xcoord1">X1</label>
             <button class="medium" onclick="NegateField('xcoord1')">+/-</button>
-            <input class="normal" type=  "number" value="" id="xcoord1" onchange="CalcUserAction()" > <br>
+            <input class="normal" type=  "number" value="" id="xcoord1" onchange="CalcUserAction()" > <br />
             <label class="normal" for="ycoord1">Y1</label>
             <button class="medium" onclick="NegateField('ycoord1')">+/-</button>
-            <input class="normal" type=  "number" value="" id="ycoord1" onchange="CalcUserAction()" > <br>
+            <input class="normal" type=  "number" value="" id="ycoord1" onchange="CalcUserAction()" > <br />
             <p class=smallbold id="xinstr1"> No action</p>
             <p class=smallbold id="yinstr1"> No action</p>
             <br />
+            
         </div>
+        
         <button class="medium" id="addcoordbutton" onclick="AddCoord()" >Add Coordinate</button>
-        <!- additional cordinate inputs generated by script ->       
+        
+        <!-- End of html code. Additional cordinate inputs generated by the AddCoord function
+               in the javascript code below ->       
         <!--
         javascript functions for calculating text for user instructions.  Also some utility functions.
         -->
-        <script>
-                                     
+        	
+        <SCRIPT type="text/javascript">
+                     
             // Important fixed values
             var NUMCOORDS = 2;    //initial number of coordinate pairs in the user interface
-            var DIALX0 = 0;         //user set starting dial value at x0
+            var DIALX0 = 0;               //user set starting dial value at x0
             var DIALY0 = 0;         //user set starting dial value at y0
             var MMPERINCH = 25.4;   //millimeters in an inch
             
@@ -174,16 +185,19 @@
             //appropriately. but at some boudaries, we need to be careful, so we introduce some error bands at these
             //boundaries, specifically when comparing against zero for dial settings, and when getting the integer floor
             //and remainder for calculating full dial turns and dial settings. See below...
+            
             var DIALFUZZ = .00001;       //fuzz factor for dial position comparisons
+            
              // mostly we don't worry about decimal numbers being a little off in their floating point representation,
              // but at some boundaries, it matters, like when we are looking for an integer floor of a division and a 
              // remainder. In these cases, we bias the dividend by a number large enough to compensate for the 
              // maximum error, but small enough to maintain accuracy in the range of numbers we are using.
+             
              var FLOATERRORBIAS = .000001; 
 
             // Initial Constants for a common class of Chinese-made minimills. These have lead screws with a 1/16th inch
             // pitch, X control clockwise motion in the positive direction, and Y control clockwise motion in the 
-            // negative direction.  o
+            // negative direction. 
             //
             var DIALMAX = .0625;    //amount the table moves with a full turn = maximum dial value
             var DIALX_SIGN = 1;     //X coordinate motion for clockwise dial rotation 1 = positive, -1 = negative
@@ -199,9 +213,9 @@
                       
             // -----------------------------------------------AddCoord--------------------------------------------------
             //
-            // This is the action function for th addcoord button. It adds a set of elements at the end of the div
-            // element coorddiv and updates variables to reflect thjs change. The user sees another set of labels,
-            // buttons and inputs for adding anothe coordinate pair.
+            // This is the action function for the addcoord button. It adds a set of elements at the end of the div
+            // element coorddiv and updates variables to reflect this change. The user sees another set of labels,
+            // buttons and inputs for adding another coordinate pair.
             //
             function AddCoord()
             {
@@ -229,7 +243,7 @@
                 xinput.id = ("xcoord"+coordindex.toString());
                 xinput.className = "normal";
                 xinput.setAttribute("type", "number");
-                xinput.addEventListener("onChange",function(){calcUserAction()});
+                xinput.addEventListener("change",CalcUserAction);
                 var xinputnode = document.createTextNode("");
                 xinput.appendChild(xinputnode);
                 coorddiv.appendChild(xinput);
@@ -254,16 +268,29 @@
                 yinput.id = ("ycoord"+coordindex.toString());
                 yinput.className = "normal";
                 yinput.setAttribute("type", "number");
-                yinput.addEventListener("onChange",function(){calcUserAction()});
+                yinput.addEventListener("change",CalcUserAction);
                 var yinputnode = document.createTextNode("");
                 yinput.appendChild(yinputnode);
                 coorddiv.appendChild(yinput);
                 
                 var ybreak = document.createElement("br"); // line break
                 coorddiv.appendChild(ybreak);
-             
                 
+                var xinstr = document.createElement("p"); // x user instruction paragraph
+                xinstr.id = ("xinstr"+coordindex.toString());
+                xinstr.className = "smallbold";
+                var xinstrtext = document.createTextNode("no action");
+                xinstr.appendChild(xinstrtext);
+                coorddiv.appendChild(xinstr);
                 
+                var yinstr = document.createElement("p"); // y user instruction paragraph
+                yinstr.id = ("yinstr"+coordindex.toString());
+                yinstr.className = "smallbold";
+                var yinstrtext = document.createTextNode("no action");
+                yinstr.appendChild(yinstrtext);
+                coorddiv.appendChild(yinstr);
+                  
+                CalcUserAction();
                 return;
             } // end of AddCoord function
             //
@@ -390,7 +417,7 @@
                 //
                 var stepsAndDial; // variable to carry calcStepsAndDial() returned structure
                 
-                for (index = 1; index <NUMCOORDS; index++)
+                for (index = 1; index < NUMCOORDS; index++)
                 {
                     // calculate user instruction and new dial value for X
                     stepsAndDial = calcStepsAndDial(xcoords[index-1],xcoords[index],dialx,"X",DIALMAX,scalefactor);
@@ -445,7 +472,7 @@
                 // table moves to -.035, which is not far enough.  Another full turn to the left, followed by a full 
                 // turn to the right gets the table to -.0625 (dial = 0) and a further turn to .01 gets us to the target
                 // position.
-                //                                                                          |<--full turn-->|
+                //                                                                          | --full turn-- |
                 //                                                                            .01
                 // dial value (^)           0---------------0---------------0---------------0--^------------0----------
                 // table position (|)                    -.1875          -.125          -.0625 |            0
